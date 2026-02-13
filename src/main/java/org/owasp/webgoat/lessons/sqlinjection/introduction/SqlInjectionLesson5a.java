@@ -60,11 +60,10 @@ public class SqlInjectionLesson5a extends AssignmentEndpoint {
     String query = "";
     try (Connection connection = dataSource.getConnection()) {
       query =
-          "SELECT * FROM user_data WHERE first_name = 'John' and last_name = '" + accountName + "'";
-      try (Statement statement =
-          connection.createStatement(
-              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
-        ResultSet results = statement.executeQuery(query);
+          "SELECT * FROM user_data WHERE first_name = 'John' and last_name = ?";
+      try (PreparedStatement ps = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
+         ps.setString(1, accountName);  // TODO: Replace with appropriate value if needed
+         ResultSet results = ps.executeQuery();
 
         if ((results != null) && (results.first())) {
           ResultSetMetaData resultsMetaData = results.getMetaData();
