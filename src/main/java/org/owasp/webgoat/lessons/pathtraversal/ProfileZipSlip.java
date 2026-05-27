@@ -3,11 +3,12 @@ package org.owasp.webgoat.lessons.pathtraversal;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.InvalidPathException;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
@@ -66,13 +67,26 @@ public class ProfileZipSlip extends ProfileUploadBase {
       var uploadedZipFile = tmpZipDirectory.resolve(file.getOriginalFilename());
       FileCopyUtils.copy(file.getBytes(), uploadedZipFile.toFile());
 
+      Path extractionDirectory = tmpZipDirectory.toAbsolutePath().normalize();
       ZipFile zip = new ZipFile(uploadedZipFile.toFile());
       Enumeration<? extends ZipEntry> entries = zip.entries();
       while (entries.hasMoreElements()) {
         ZipEntry e = entries.nextElement();
-        File f = new File(tmpZipDirectory.toFile(), e.getName());
+        Path entryPath;
+        try {
+          entryPath = Path.of(e.getName()).normalize();
+        } catch (InvalidPathException ex) {
+          throw new IOException("Invalid zip entry: " + e.getName(), ex);
+        }
+        if (entryPath.isAbsolute()) {
+          throw new IOException("Invalid zip entry: " + e.getName());
+        }
+        Path target = extractionDirectory.resolve(entryPath).normalize();
+        if (!target.startsWith(extractionDirectory)) {
+          throw new IOException("Invalid zip entry: " + e.getName());
+        }
         InputStream is = zip.getInputStream(e);
-        Files.copy(is, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
       }
 
       return isSolved(currentImage, getProfilePictureAsBase64(username));
