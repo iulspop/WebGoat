@@ -3,10 +3,10 @@ package org.owasp.webgoat.lessons.pathtraversal;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -67,12 +67,16 @@ public class ProfileZipSlip extends ProfileUploadBase {
       FileCopyUtils.copy(file.getBytes(), uploadedZipFile.toFile());
 
       ZipFile zip = new ZipFile(uploadedZipFile.toFile());
+      Path normalizedTmpZipDirectory = tmpZipDirectory.toAbsolutePath().normalize();
       Enumeration<? extends ZipEntry> entries = zip.entries();
       while (entries.hasMoreElements()) {
         ZipEntry e = entries.nextElement();
-        File f = new File(tmpZipDirectory.toFile(), e.getName());
+        Path f = normalizedTmpZipDirectory.resolve(e.getName()).normalize();
+        if (!f.startsWith(normalizedTmpZipDirectory)) {
+          throw new IOException("Invalid zip entry: " + e.getName());
+        }
         InputStream is = zip.getInputStream(e);
-        Files.copy(is, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(is, f, StandardCopyOption.REPLACE_EXISTING);
       }
 
       return isSolved(currentImage, getProfilePictureAsBase64(username));
