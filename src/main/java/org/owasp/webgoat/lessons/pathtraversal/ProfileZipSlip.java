@@ -3,10 +3,10 @@ package org.owasp.webgoat.lessons.pathtraversal;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -63,16 +63,30 @@ public class ProfileZipSlip extends ProfileUploadBase {
     var currentImage = getProfilePictureAsBase64(username);
 
     try {
-      var uploadedZipFile = tmpZipDirectory.resolve(file.getOriginalFilename());
+      Path normalizedTmpZipDirectory = tmpZipDirectory.toAbsolutePath().normalize();
+      var uploadedZipFile = normalizedTmpZipDirectory.resolve(file.getOriginalFilename());
       FileCopyUtils.copy(file.getBytes(), uploadedZipFile.toFile());
 
-      ZipFile zip = new ZipFile(uploadedZipFile.toFile());
-      Enumeration<? extends ZipEntry> entries = zip.entries();
-      while (entries.hasMoreElements()) {
-        ZipEntry e = entries.nextElement();
-        File f = new File(tmpZipDirectory.toFile(), e.getName());
-        InputStream is = zip.getInputStream(e);
-        Files.copy(is, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      try (ZipFile zip = new ZipFile(uploadedZipFile.toFile())) {
+        Enumeration<? extends ZipEntry> entries = zip.entries();
+        while (entries.hasMoreElements()) {
+          ZipEntry e = entries.nextElement();
+          Path destination = normalizedTmpZipDirectory.resolve(e.getName()).normalize();
+          if (!destination.startsWith(normalizedTmpZipDirectory)) {
+            throw new IOException("Invalid ZIP entry path: " + e.getName());
+          }
+          if (e.isDirectory()) {
+            Files.createDirectories(destination);
+            continue;
+          }
+          Path parent = destination.getParent();
+          if (parent != null) {
+            Files.createDirectories(parent);
+          }
+          try (InputStream is = zip.getInputStream(e)) {
+            Files.copy(is, destination, StandardCopyOption.REPLACE_EXISTING);
+          }
+        }
       }
 
       return isSolved(currentImage, getProfilePictureAsBase64(username));
