@@ -3,10 +3,10 @@ package org.owasp.webgoat.lessons.pathtraversal;
 import static org.springframework.http.MediaType.ALL_VALUE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -68,11 +68,23 @@ public class ProfileZipSlip extends ProfileUploadBase {
 
       ZipFile zip = new ZipFile(uploadedZipFile.toFile());
       Enumeration<? extends ZipEntry> entries = zip.entries();
+      Path extractionRoot = tmpZipDirectory.toAbsolutePath().normalize();
       while (entries.hasMoreElements()) {
         ZipEntry e = entries.nextElement();
-        File f = new File(tmpZipDirectory.toFile(), e.getName());
-        InputStream is = zip.getInputStream(e);
-        Files.copy(is, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        if (e.isDirectory()) {
+          continue;
+        }
+        Path extractedPath = extractionRoot.resolve(e.getName()).normalize();
+        if (!extractedPath.startsWith(extractionRoot)) {
+          throw new IOException("Illegal ZIP entry: " + e.getName());
+        }
+        Path parent = extractedPath.getParent();
+        if (parent != null) {
+          Files.createDirectories(parent);
+        }
+        try (InputStream is = zip.getInputStream(e)) {
+          Files.copy(is, extractedPath, StandardCopyOption.REPLACE_EXISTING);
+        }
       }
 
       return isSolved(currentImage, getProfilePictureAsBase64(username));
