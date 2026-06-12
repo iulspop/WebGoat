@@ -49,16 +49,27 @@ public class IDORLogin extends AssignmentEndpoint {
   public void initIDORInfo() {
 
     idorUserInfo.put("tom", new HashMap<String, String>());
-    idorUserInfo.get("tom").put("password", "cat");
+    idorUserInfo.get("tom").put("password", getPassword("webgoat.idor.tom.password", "WEBGOAT_IDOR_TOM_PASSWORD"));
     idorUserInfo.get("tom").put("id", "2342384");
     idorUserInfo.get("tom").put("color", "yellow");
     idorUserInfo.get("tom").put("size", "small");
 
     idorUserInfo.put("bill", new HashMap<String, String>());
-    idorUserInfo.get("bill").put("password", "buffalo");
+    idorUserInfo.get("bill").put("password", getPassword("webgoat.idor.bill.password", "WEBGOAT_IDOR_BILL_PASSWORD"));
     idorUserInfo.get("bill").put("id", "2342388");
     idorUserInfo.get("bill").put("color", "brown");
     idorUserInfo.get("bill").put("size", "large");
+  }
+
+  private String getPassword(String propertyName, String envName) {
+    String password = System.getProperty(propertyName);
+    if (password == null || password.isBlank()) {
+      password = System.getenv(envName);
+    }
+    if (password == null || password.isBlank()) {
+      throw new IllegalStateException("Missing required password configuration for " + propertyName);
+    }
+    return password;
   }
 
   @PostMapping("/IDOR/login")
