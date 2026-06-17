@@ -63,10 +63,10 @@ public class SqlInjectionChallenge extends AssignmentEndpoint {
     if (attackResult == null) {
 
       try (Connection connection = dataSource.getConnection()) {
-        String checkUserQuery =
-            "select userid from sql_challenge_users where userid = '" + username_reg + "'";
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(checkUserQuery);
+        String checkUserQuery = "select userid from sql_challenge_users where userid = ?";
+        PreparedStatement statement = connection.prepareStatement(checkUserQuery);
+        statement.setString(1, username_reg);
+        ResultSet resultSet = statement.executeQuery();
 
         if (resultSet.next()) {
           if (username_reg.contains("tom'")) {
@@ -80,7 +80,7 @@ public class SqlInjectionChallenge extends AssignmentEndpoint {
           preparedStatement.setString(1, username_reg);
           preparedStatement.setString(2, email_reg);
           preparedStatement.setString(3, password_reg);
-          preparedStatement.execute();
+          preparedStatement.executeUpdate();
           attackResult = success(this).feedback("user.created").feedbackArgs(username_reg).build();
         }
       } catch (SQLException e) {
